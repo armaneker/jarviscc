@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Loader2, AlertCircle, Camera as CameraIcon, X, Grid3X3, Grid2X2, Eye, EyeOff, CheckCircle, XCircle, Lock, Clock, Trash2 } from 'lucide-react';
+import { Plus, Search, Loader2, AlertCircle, Camera as CameraIcon, X, Grid3X3, Grid2X2, Eye, EyeOff, CheckCircle, XCircle, Lock, Clock, Trash2, Check, Minus, PlayCircle } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import CameraCard from '../components/CameraCard';
 import { cameraApi } from '../services/api';
@@ -15,6 +15,7 @@ export default function Cameras() {
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
   const [gridSize, setGridSize] = useState<GridSize>('3x3');
   const [expandedCamera, setExpandedCamera] = useState<Camera | null>(null);
+  const [playAllTrigger, setPlayAllTrigger] = useState(0);
 
   const { data: cameras, isLoading, error } = useQuery({
     queryKey: ['cameras'],
@@ -83,6 +84,17 @@ export default function Cameras() {
                 <Grid3X3 className="w-4 h-4" />
               </button>
             </div>
+
+            {cameras && cameras.length > 0 && (
+              <button
+                onClick={() => setPlayAllTrigger((t) => t + 1)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
+                title="Start all camera streams"
+              >
+                <PlayCircle className="w-4 h-4" />
+                <span>Play All</span>
+              </button>
+            )}
 
             <button
               onClick={() => setShowDiscoverModal(true)}
@@ -153,6 +165,7 @@ export default function Cameras() {
               camera={camera}
               onExpand={setExpandedCamera}
               onSettings={setEditingCamera}
+              autoStartTrigger={playAllTrigger}
             />
           ))}
         </div>
@@ -171,9 +184,12 @@ export default function Cameras() {
       {showDiscoverModal && (
         <DiscoverModal
           onClose={() => setShowDiscoverModal(false)}
-          onAdd={(camera) => {
-            addCameraMutation.mutate(camera);
-            setShowDiscoverModal(false);
+          existingIps={cameras?.map((c) => c.ip_address) || []}
+          onAddCamera={async (camera) => {
+            await addCameraMutation.mutateAsync(camera);
+          }}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ['cameras'] });
           }}
         />
       )}
@@ -329,11 +345,22 @@ function AddCameraModal({ onClose, onAdd, isLoading }: AddCameraModalProps) {
 // Discover Modal Component
 interface DiscoverModalProps {
   onClose: () => void;
-  onAdd: (camera: CameraCreate) => void;
+  existingIps: string[];
+  onAddCamera: (camera: CameraCreate) => Promise<void>;
+  onComplete: () => void;
 }
 
-function DiscoverModal({ onClose, onAdd }: DiscoverModalProps) {
+interface AddResult {
+  ip: string;
+  status: 'pending' | 'adding' | 'success' | 'error' | 'skipped';
+  error?: string;
+}
+
+function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: DiscoverModalProps) {
   const [network, setNetwork] = useState('192.168.1.0/24');
+  const [selectedIps, setSelectedIps] = useState<Set<string>>(new Set());
+  const [isAdding, setIsAdding] = useState(false);
+  const [addResults, setAddResults] = useState<AddResult[]>([]);
 
   const { data: discovered, isLoading, refetch } = useQuery({
     queryKey: ['discover-cameras', network],
@@ -341,18 +368,95 @@ function DiscoverModal({ onClose, onAdd }: DiscoverModalProps) {
     enabled: false,
   });
 
+  // Filter out already existing cameras
+  const existingSet = new Set(existingIps);
+  const availableCameras = discovered?.filter((c) => !existingSet.has(c.ip_address)) || [];
+  const existingCameras = discovered?.filter((c) => existingSet.has(c.ip_address)) || [];
+
   const handleDiscover = () => {
+    setSelectedIps(new Set());
+    setAddResults([]);
     refetch();
   };
 
-  const handleAddCamera = (camera: CameraDiscovery) => {
-    onAdd({
-      name: camera.name || `Camera ${camera.ip_address}`,
-      ip_address: camera.ip_address,
-      port: camera.port,
-      brand: camera.brand,
+  const toggleSelection = (ip: string) => {
+    if (existingSet.has(ip)) return; // Can't select existing cameras
+    setSelectedIps((prev) => {
+      const next = new Set(prev);
+      if (next.has(ip)) {
+        next.delete(ip);
+      } else {
+        next.add(ip);
+      }
+      return next;
     });
   };
+
+  const toggleSelectAll = () => {
+    if (selectedIps.size === availableCameras.length) {
+      setSelectedIps(new Set());
+    } else {
+      setSelectedIps(new Set(availableCameras.map((c) => c.ip_address)));
+    }
+  };
+
+  const handleAddSelected = async () => {
+    if (!discovered) return;
+
+    const camerasToAdd = discovered
+      .filter((c) => selectedIps.has(c.ip_address))
+      .map((camera) => ({
+        name: camera.name || `Camera ${camera.ip_address}`,
+        ip_address: camera.ip_address,
+        port: camera.port,
+        brand: camera.brand,
+      }));
+
+    setIsAdding(true);
+    setAddResults(camerasToAdd.map((c) => ({ ip: c.ip_address, status: 'pending' })));
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < camerasToAdd.length; i++) {
+      const camera = camerasToAdd[i];
+
+      // Update status to adding
+      setAddResults((prev) =>
+        prev.map((r) => (r.ip === camera.ip_address ? { ...r, status: 'adding' } : r))
+      );
+
+      try {
+        await onAddCamera(camera);
+        setAddResults((prev) =>
+          prev.map((r) => (r.ip === camera.ip_address ? { ...r, status: 'success' } : r))
+        );
+        successCount++;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Failed to add';
+        setAddResults((prev) =>
+          prev.map((r) => (r.ip === camera.ip_address ? { ...r, status: 'error', error: errorMsg } : r))
+        );
+        errorCount++;
+      }
+    }
+
+    setIsAdding(false);
+    onComplete();
+
+    // Clear selection for successfully added cameras
+    setSelectedIps((prev) => {
+      const next = new Set(prev);
+      addResults.forEach((r) => {
+        if (r.status === 'success') next.delete(r.ip);
+      });
+      return next;
+    });
+  };
+
+  const allSelected = availableCameras.length > 0 && selectedIps.size === availableCameras.length;
+  const someSelected = selectedIps.size > 0;
+  const addResultsMap = new Map(addResults.map((r) => [r.ip, r]));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -374,50 +478,163 @@ function DiscoverModal({ onClose, onAdd }: DiscoverModalProps) {
           />
           <button
             onClick={handleDiscover}
-            disabled={isLoading}
+            disabled={isLoading || isAdding}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Scan'}
           </button>
         </div>
 
-        <div className="max-h-80 overflow-y-auto">
+        <div className="max-h-80 overflow-y-auto px-1">
           {discovered && discovered.length === 0 && (
             <p className="text-slate-400 text-center py-8">No cameras found on this network</p>
           )}
 
           {discovered && discovered.length > 0 && (
             <div className="space-y-2">
-              {discovered.map((camera, index) => (
+              {/* Select All Header */}
+              {availableCameras.length > 0 && (
                 <div
-                  key={index}
-                  className="bg-slate-700 rounded-lg p-3 flex items-center justify-between"
+                  className={`flex items-center gap-3 p-2 border-b border-slate-700 mb-2 rounded-lg transition-colors ${
+                    isAdding ? 'opacity-50' : 'cursor-pointer hover:bg-slate-700/50'
+                  }`}
+                  onClick={isAdding ? undefined : toggleSelectAll}
                 >
-                  <div>
-                    <p className="text-white font-medium">{camera.ip_address}:{camera.port}</p>
-                    <p className="text-slate-400 text-sm">
-                      {camera.brand} {camera.is_dahua && '(Dahua)'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleAddCamera(camera)}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors"
+                  <div
+                    className={`w-5 h-5 rounded flex items-center justify-center transition-all ${
+                      allSelected
+                        ? 'bg-blue-600 border-blue-600'
+                        : someSelected
+                          ? 'bg-blue-600/50 border-blue-500'
+                          : 'bg-slate-700 border-2 border-slate-500 hover:border-slate-400'
+                    }`}
                   >
-                    Add
-                  </button>
+                    {allSelected ? (
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    ) : someSelected ? (
+                      <Minus className="w-3.5 h-3.5 text-white" />
+                    ) : null}
+                  </div>
+                  <span className="text-slate-300 text-sm">
+                    {selectedIps.size > 0
+                      ? `${selectedIps.size} of ${availableCameras.length} selected`
+                      : `Select all new (${availableCameras.length})`}
+                  </span>
                 </div>
-              ))}
+              )}
+
+              {/* Available cameras */}
+              {availableCameras.map((camera) => {
+                const result = addResultsMap.get(camera.ip_address);
+                return (
+                  <div
+                    key={camera.ip_address}
+                    onClick={isAdding ? undefined : () => toggleSelection(camera.ip_address)}
+                    className={`rounded-lg p-3 flex items-center gap-3 transition-all ${
+                      isAdding ? '' : 'cursor-pointer'
+                    } ${
+                      result?.status === 'success'
+                        ? 'bg-green-600/20 border-2 border-green-500'
+                        : result?.status === 'error'
+                          ? 'bg-red-600/20 border-2 border-red-500'
+                          : selectedIps.has(camera.ip_address)
+                            ? 'bg-blue-600/20 border-2 border-blue-500'
+                            : 'bg-slate-700 border-2 border-transparent hover:bg-slate-600 hover:border-slate-500'
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded flex items-center justify-center transition-all flex-shrink-0 ${
+                        result?.status === 'success'
+                          ? 'bg-green-600'
+                          : result?.status === 'error'
+                            ? 'bg-red-600'
+                            : result?.status === 'adding'
+                              ? 'bg-blue-600'
+                              : selectedIps.has(camera.ip_address)
+                                ? 'bg-blue-600'
+                                : 'bg-slate-600 border-2 border-slate-500'
+                      }`}
+                    >
+                      {result?.status === 'adding' ? (
+                        <Loader2 className="w-3 h-3 text-white animate-spin" />
+                      ) : result?.status === 'success' ? (
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      ) : result?.status === 'error' ? (
+                        <X className="w-3.5 h-3.5 text-white" />
+                      ) : selectedIps.has(camera.ip_address) ? (
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      ) : null}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium">{camera.ip_address}:{camera.port}</p>
+                      <p className="text-slate-400 text-sm">
+                        {result?.status === 'success' ? (
+                          <span className="text-green-400">Added successfully</span>
+                        ) : result?.status === 'error' ? (
+                          <span className="text-red-400">{result.error || 'Failed to add'}</span>
+                        ) : (
+                          <>
+                            {camera.brand} {camera.is_dahua && '(Dahua)'}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Already added cameras */}
+              {existingCameras.length > 0 && (
+                <>
+                  <div className="text-slate-500 text-xs uppercase tracking-wide mt-4 mb-2 px-2">
+                    Already Added ({existingCameras.length})
+                  </div>
+                  {existingCameras.map((camera) => (
+                    <div
+                      key={camera.ip_address}
+                      className="rounded-lg p-3 flex items-center gap-3 bg-slate-700/50 border-2 border-transparent opacity-60"
+                    >
+                      <div className="w-5 h-5 rounded flex items-center justify-center bg-green-600/50 flex-shrink-0">
+                        <Check className="w-3.5 h-3.5 text-green-300" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-slate-300 font-medium">{camera.ip_address}:{camera.port}</p>
+                        <p className="text-slate-500 text-sm">Already in your cameras</p>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
 
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-between mt-4">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
           >
-            Close
+            {addResults.some((r) => r.status === 'success') ? 'Done' : 'Close'}
           </button>
+          {availableCameras.length > 0 && (
+            <button
+              onClick={handleAddSelected}
+              disabled={!someSelected || isAdding}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {isAdding ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  Add Selected ({selectedIps.size})
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -435,6 +652,7 @@ interface EditCameraModalProps {
 }
 
 function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDeleting }: EditCameraModalProps) {
+  const hasExistingCredentials = Boolean(camera.username);
   const [formData, setFormData] = useState({
     name: camera.name,
     port: camera.port,
@@ -444,6 +662,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
     location: camera.location || '',
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [changePassword, setChangePassword] = useState(!hasExistingCredentials);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error' | 'locked'>('idle');
   const [testMessage, setTestMessage] = useState('');
   const [lockTimeRemaining, setLockTimeRemaining] = useState<number | null>(null);
@@ -561,7 +780,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Username *</label>
+            <label className="block text-sm text-slate-400 mb-1">Username <span className="text-red-400">*</span></label>
             <input
               type="text"
               value={formData.username}
@@ -569,32 +788,69 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
                 setFormData({ ...formData, username: e.target.value });
                 setTestStatus('idle');
               }}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
+              className={`w-full bg-slate-700 border rounded-lg px-3 py-2 text-white ${
+                !formData.username ? 'border-yellow-500/50' : 'border-slate-600'
+              }`}
               placeholder="admin"
+              required
             />
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Password *</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => {
-                  setFormData({ ...formData, password: e.target.value });
-                  setTestStatus('idle');
-                }}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 pr-10 text-white"
-                placeholder="Enter password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
+            <label className="block text-sm text-slate-400 mb-1">
+              Password {!hasExistingCredentials && <span className="text-red-400">*</span>}
+            </label>
+            {hasExistingCredentials && !changePassword ? (
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-400">
+                  ••••••••••••
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setChangePassword(true)}
+                  className="px-3 py-2 bg-slate-600 hover:bg-slate-500 rounded-lg text-sm transition-colors"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({ ...formData, password: e.target.value });
+                      setTestStatus('idle');
+                    }}
+                    className={`w-full bg-slate-700 border rounded-lg px-3 py-2 pr-10 text-white ${
+                      (!hasExistingCredentials || changePassword) && !formData.password ? 'border-yellow-500/50' : 'border-slate-600'
+                    }`}
+                    placeholder={hasExistingCredentials ? "Enter new password" : "Enter password"}
+                    required={!hasExistingCredentials}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {hasExistingCredentials && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChangePassword(false);
+                      setFormData({ ...formData, password: '' });
+                    }}
+                    className="text-slate-400 hover:text-slate-300 text-sm"
+                  >
+                    Cancel password change
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -620,6 +876,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
               onClick={handleTestConnection}
               disabled={testStatus === 'testing' || testStatus === 'locked' || !formData.username || !formData.password}
               className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              title={!formData.password ? "Enter password to test connection" : "Test camera connection"}
             >
               {testStatus === 'testing' ? (
                 <>
@@ -745,12 +1002,27 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
             </button>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !formData.username || (!hasExistingCredentials && !formData.password) || (changePassword && !formData.password)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </button>
           </div>
+          {!formData.username && (
+            <p className="text-yellow-500 text-xs mt-2 text-right">
+              Username is required
+            </p>
+          )}
+          {!hasExistingCredentials && !formData.password && (
+            <p className="text-yellow-500 text-xs mt-2 text-right">
+              Password is required for new cameras
+            </p>
+          )}
+          {changePassword && !formData.password && hasExistingCredentials && (
+            <p className="text-yellow-500 text-xs mt-2 text-right">
+              Enter a new password or cancel the change
+            </p>
+          )}
         </form>
       </div>
     </div>

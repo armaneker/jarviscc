@@ -8,14 +8,16 @@ interface CameraCardProps {
   camera: CameraType;
   onExpand?: (camera: CameraType) => void;
   onSettings?: (camera: CameraType) => void;
+  autoStartTrigger?: number; // Increment this to trigger auto-start
 }
 
-export default function CameraCard({ camera, onExpand, onSettings }: CameraCardProps) {
+export default function CameraCard({ camera, onExpand, onSettings, autoStartTrigger }: CameraCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastTriggerRef = useRef<number>(0);
 
   useEffect(() => {
     // Cleanup on unmount
@@ -25,6 +27,14 @@ export default function CameraCard({ camera, onExpand, onSettings }: CameraCardP
       }
     };
   }, []);
+
+  // Handle auto-start trigger
+  useEffect(() => {
+    if (autoStartTrigger && autoStartTrigger > lastTriggerRef.current && !isStreaming && !isLoading) {
+      lastTriggerRef.current = autoStartTrigger;
+      startStream();
+    }
+  }, [autoStartTrigger]);
 
   const startStream = async () => {
     if (!videoRef.current) return;
