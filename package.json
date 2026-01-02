@@ -1,0 +1,14 @@
+{
+  "name": "jarvis",
+  "version": "1.0.0",
+  "description": "Jarvis Home Automation System",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "backend": "cd backend && source venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8101 --reload"
+  },
+  "keywords": ["home-automation", "jarvis", "cameras", "dahua"],
+  "author": "",
+  "license": "ISC"
+}

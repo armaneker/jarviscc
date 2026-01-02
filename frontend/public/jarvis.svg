@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Iron Man Mask -->
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700"/>
+      <stop offset="50%" style="stop-color:#FFA500"/>
+      <stop offset="100%" style="stop-color:#FF6B00"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#DC143C"/>
+      <stop offset="100%" style="stop-color:#8B0000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer helmet shape -->
+  <path d="M50 5 C20 5 10 35 10 55 C10 80 25 95 50 95 C75 95 90 80 90 55 C90 35 80 5 50 5" fill="url(#red)" stroke="#8B0000" stroke-width="2"/>
+
+  <!-- Face plate -->
+  <path d="M50 15 C30 15 20 40 20 55 C20 75 32 85 50 85 C68 85 80 75 80 55 C80 40 70 15 50 15" fill="url(#gold)" stroke="#CC8400" stroke-width="1"/>
+
+  <!-- Left eye -->
+  <path d="M25 45 L38 40 L42 50 L35 55 Z" fill="#00BFFF" stroke="#0080FF" stroke-width="1">
+    <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Right eye -->
+  <path d="M75 45 L62 40 L58 50 L65 55 Z" fill="#00BFFF" stroke="#0080FF" stroke-width="1">
+    <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Mouth slit -->
+  <path d="M35 70 L50 75 L65 70" fill="none" stroke="#8B0000" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Center line -->
+  <line x1="50" y1="30" x2="50" y2="65" stroke="#CC8400" stroke-width="1"/>
+</svg>
