@@ -2,12 +2,18 @@ import { useState } from 'react';
 import { Settings as SettingsIcon, Server, Database, Info } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { useQuery } from '@tanstack/react-query';
-import { healthApi } from '../services/api';
+import { healthApi, API_BASE_URL } from '../services/api';
+
+const readSavedApiUrl = (): string => {
+  try {
+    return localStorage.getItem('jarvis_api_url') || API_BASE_URL;
+  } catch {
+    return API_BASE_URL;
+  }
+};
 
 export default function Settings() {
-  const [apiUrl, setApiUrl] = useState(
-    localStorage.getItem('jarvis_api_url') || 'http://localhost:8000'
-  );
+  const [apiUrl, setApiUrl] = useState(readSavedApiUrl);
 
   const { data: health, isLoading, error } = useQuery({
     queryKey: ['health'],
@@ -16,20 +22,24 @@ export default function Settings() {
   });
 
   const handleSaveApiUrl = () => {
-    localStorage.setItem('jarvis_api_url', apiUrl);
+    try {
+      localStorage.setItem('jarvis_api_url', apiUrl.trim().replace(/\/+$/, ''));
+    } catch {
+      // Ignore storage errors on restricted browsers.
+    }
     window.location.reload();
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Settings"
         subtitle="Configure your Jarvis system"
       />
 
-      <div className="space-y-6 max-w-2xl">
+      <div className="max-w-3xl space-y-6">
         {/* Backend Status */}
-        <div className="bg-slate-800 rounded-xl p-6">
+        <div className="bg-slate-800 rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4">
             <Server className="w-5 h-5 text-blue-400" />
             <h2 className="text-lg font-semibold text-white">Backend Status</h2>
@@ -60,7 +70,7 @@ export default function Settings() {
         </div>
 
         {/* API Configuration */}
-        <div className="bg-slate-800 rounded-xl p-6">
+        <div className="bg-slate-800 rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4">
             <Database className="w-5 h-5 text-blue-400" />
             <h2 className="text-lg font-semibold text-white">API Configuration</h2>
@@ -74,12 +84,12 @@ export default function Settings() {
                 value={apiUrl}
                 onChange={(e) => setApiUrl(e.target.value)}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
-                placeholder="http://localhost:8000"
+                placeholder="http://localhost:8101"
               />
             </div>
             <button
               onClick={handleSaveApiUrl}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
             >
               Save & Reload
             </button>
@@ -87,7 +97,7 @@ export default function Settings() {
         </div>
 
         {/* About */}
-        <div className="bg-slate-800 rounded-xl p-6">
+        <div className="bg-slate-800 rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4">
             <Info className="w-5 h-5 text-blue-400" />
             <h2 className="text-lg font-semibold text-white">About</h2>
@@ -106,7 +116,7 @@ export default function Settings() {
         </div>
 
         {/* Camera Configuration Tips */}
-        <div className="bg-slate-800 rounded-xl p-6">
+        <div className="bg-slate-800 rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4">
             <SettingsIcon className="w-5 h-5 text-blue-400" />
             <h2 className="text-lg font-semibold text-white">Dahua Camera Setup</h2>
@@ -124,7 +134,7 @@ export default function Settings() {
 
             <div>
               <h3 className="text-white font-medium mb-1">RTSP URL Format</h3>
-              <code className="block bg-slate-900 p-2 rounded text-green-400 text-xs">
+              <code className="block overflow-x-auto rounded bg-slate-900 p-2 text-xs text-green-400">
                 rtsp://username:password@ip:554/cam/realmonitor?channel=1&subtype=1
               </code>
               <p className="mt-1">

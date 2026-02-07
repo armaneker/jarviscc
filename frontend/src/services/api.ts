@@ -12,13 +12,77 @@ import type {
   Stats,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8101';
+const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_URL?.trim() || '';
+const FRONTEND_DEV_PORTS = new Set(['3000', '5173', '5501']);
+
+const normalizeBaseUrl = (url: string): string => url.trim().replace(/\/+$/, '');
+const getLanBackendFallback = (): string => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8101`;
+  }
+  return DEFAULT_API_BASE_URL || 'http://localhost:8101';
+};
+
+const parseUrl = (url: string): URL | null => {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+};
+
+const looksLikeFrontendDevOrigin = (url: URL): boolean => FRONTEND_DEV_PORTS.has(url.port);
+
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const currentUrl = parseUrl(window.location.origin);
+
+    // Some embedded/older browsers can throw when storage is restricted.
+    try {
+      const savedUrl = window.localStorage.getItem('jarvis_api_url');
+      if (savedUrl?.trim()) {
+        const parsedSaved = parseUrl(savedUrl.trim());
+        if (parsedSaved && !looksLikeFrontendDevOrigin(parsedSaved)) {
+          return savedUrl;
+        }
+      }
+    } catch {
+      // Ignore storage errors and continue with same-origin fallback.
+    }
+
+    // If app is opened from Vite dev server, default API should still be backend.
+    if (currentUrl && looksLikeFrontendDevOrigin(currentUrl)) {
+      return getLanBackendFallback();
+    }
+
+    // Same-origin default works for LAN deployment served by FastAPI.
+    return window.location.origin;
+  }
+  return DEFAULT_API_BASE_URL || 'http://localhost:8101';
+};
+
+const API_BASE_URL = normalizeBaseUrl(getApiBaseUrl());
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+api.interceptors.response.use((response) => {
+  const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
+  const bodyStartsWithHtml =
+    typeof response.data === 'string' &&
+    response.data.trim().toLowerCase().startsWith('<!doctype html');
+
+  if (contentType.includes('text/html') || bodyStartsWithHtml) {
+    throw new Error(
+      `API base URL appears incorrect (${API_BASE_URL}). Received HTML instead of JSON.`
+    );
+  }
+
+  return response;
 });
 
 // Camera API

@@ -37,9 +37,16 @@ export default function Dashboard() {
     queryFn: statsApi.get,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
+  const hasValidStats = Boolean(
+    stats &&
+    stats.cameras &&
+    stats.devices &&
+    stats.tasks &&
+    stats.shopping
+  );
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Dashboard"
         subtitle="Welcome to your Jarvis home automation system"
@@ -60,7 +67,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {stats && (
+      {stats && hasValidStats && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard
@@ -132,6 +139,15 @@ export default function Dashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {stats && !hasValidStats && (
+        <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 flex items-center gap-3 mt-4">
+          <AlertCircle className="w-5 h-5 text-red-500" />
+          <span className="text-red-200">
+            Received invalid stats response from backend API.
+          </span>
+        </div>
       )}
     </div>
   );

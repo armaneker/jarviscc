@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Loader2, AlertCircle, Camera as CameraIcon, X, Grid3X3, Grid2X2, Eye, EyeOff, CheckCircle, XCircle, Lock, Clock, Trash2, Check, Minus, PlayCircle } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import CameraCard from '../components/CameraCard';
-import { cameraApi } from '../services/api';
-import type { Camera, CameraCreate, CameraDiscovery } from '../types';
+import { cameraApi, API_BASE_URL } from '../services/api';
+import type { Camera, CameraCreate } from '../types';
 
 type GridSize = '2x2' | '3x3' | '4x4';
 
@@ -54,14 +54,14 @@ export default function Cameras() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Security Cameras"
         subtitle={`${cameras?.length || 0} cameras configured`}
         action={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-3">
             {/* Grid Size Selector */}
-            <div className="flex bg-slate-800 rounded-lg p-1">
+            <div className="order-last flex w-full justify-center rounded-lg bg-slate-800 p-1 sm:order-none sm:w-auto sm:justify-start">
               <button
                 onClick={() => setGridSize('2x2')}
                 className={`p-2 rounded ${gridSize === '2x2' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
@@ -88,27 +88,29 @@ export default function Cameras() {
             {cameras && cameras.length > 0 && (
               <button
                 onClick={() => setPlayAllTrigger((t) => t + 1)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
+                className="flex min-h-10 items-center gap-2 px-3 py-2 sm:px-4 bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
                 title="Start all camera streams"
               >
                 <PlayCircle className="w-4 h-4" />
-                <span>Play All</span>
+                <span className="hidden sm:inline">Play All</span>
               </button>
             )}
 
             <button
               onClick={() => setShowDiscoverModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="flex min-h-10 items-center gap-2 px-3 py-2 sm:px-4 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              title="Discover cameras"
             >
               <Search className="w-4 h-4" />
-              <span>Discover</span>
+              <span className="hidden sm:inline">Discover</span>
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+              className="flex min-h-10 items-center gap-2 px-3 py-2 sm:px-4 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+              title="Add camera"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Camera</span>
+              <span className="hidden sm:inline">Add Camera</span>
             </button>
           </div>
         }
@@ -131,23 +133,23 @@ export default function Cameras() {
 
       {/* Empty State */}
       {cameras && cameras.length === 0 && (
-        <div className="bg-slate-800 rounded-xl p-12 text-center">
+        <div className="bg-slate-800 rounded-xl p-8 sm:p-12 text-center">
           <CameraIcon className="w-16 h-16 text-slate-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">No cameras configured</h3>
           <p className="text-slate-400 mb-6">
             Add your Dahua cameras to start monitoring your home security.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <button
               onClick={() => setShowDiscoverModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
             >
               <Search className="w-4 h-4" />
               <span>Discover Cameras</span>
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>Add Manually</span>
@@ -242,8 +244,8 @@ function AddCameraModal({ onClose, onAdd, isLoading }: AddCameraModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="bg-slate-800 rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Add Camera</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
@@ -264,8 +266,8 @@ function AddCameraModal({ onClose, onAdd, isLoading }: AddCameraModalProps) {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
               <label className="block text-sm text-slate-400 mb-1">IP Address</label>
               <input
                 type="text"
@@ -287,7 +289,7 @@ function AddCameraModal({ onClose, onAdd, isLoading }: AddCameraModalProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-slate-400 mb-1">Username</label>
               <input
@@ -320,18 +322,18 @@ function AddCameraModal({ onClose, onAdd, isLoading }: AddCameraModalProps) {
             />
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Camera'}
             </button>
@@ -414,9 +416,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
 
     setIsAdding(true);
     setAddResults(camerasToAdd.map((c) => ({ ip: c.ip_address, status: 'pending' })));
-
-    let successCount = 0;
-    let errorCount = 0;
+    const successfulIps = new Set<string>();
 
     for (let i = 0; i < camerasToAdd.length; i++) {
       const camera = camerasToAdd[i];
@@ -431,13 +431,17 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
         setAddResults((prev) =>
           prev.map((r) => (r.ip === camera.ip_address ? { ...r, status: 'success' } : r))
         );
-        successCount++;
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Failed to add';
+        successfulIps.add(camera.ip_address);
+      } catch (error: unknown) {
+        let errorMsg = 'Failed to add';
+        if (error instanceof Error) {
+          errorMsg = error.message;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+          errorMsg = String(error.message);
+        }
         setAddResults((prev) =>
           prev.map((r) => (r.ip === camera.ip_address ? { ...r, status: 'error', error: errorMsg } : r))
         );
-        errorCount++;
       }
     }
 
@@ -447,9 +451,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
     // Clear selection for successfully added cameras
     setSelectedIps((prev) => {
       const next = new Set(prev);
-      addResults.forEach((r) => {
-        if (r.status === 'success') next.delete(r.ip);
-      });
+      successfulIps.forEach((ip) => next.delete(ip));
       return next;
     });
   };
@@ -459,8 +461,8 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
   const addResultsMap = new Map(addResults.map((r) => [r.ip, r]));
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="bg-slate-800 rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full max-w-lg max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Discover Cameras</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
@@ -468,7 +470,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
           </button>
         </div>
 
-        <div className="flex gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
             type="text"
             value={network}
@@ -485,7 +487,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
           </button>
         </div>
 
-        <div className="max-h-80 overflow-y-auto px-1">
+        <div className="max-h-[55vh] overflow-y-auto px-1">
           {discovered && discovered.length === 0 && (
             <p className="text-slate-400 text-center py-8">No cameras found on this network</p>
           )}
@@ -530,7 +532,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
                   <div
                     key={camera.ip_address}
                     onClick={isAdding ? undefined : () => toggleSelection(camera.ip_address)}
-                    className={`rounded-lg p-3 flex items-center gap-3 transition-all ${
+                    className={`rounded-lg p-3 flex items-start gap-3 transition-all ${
                       isAdding ? '' : 'cursor-pointer'
                     } ${
                       result?.status === 'success'
@@ -609,7 +611,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
           )}
         </div>
 
-        <div className="flex justify-between mt-4">
+        <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-4">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
@@ -620,7 +622,7 @@ function DiscoverModal({ onClose, existingIps, onAddCamera, onComplete }: Discov
             <button
               onClick={handleAddSelected}
               disabled={!someSelected || isAdding}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isAdding ? (
                 <>
@@ -652,9 +654,10 @@ interface EditCameraModalProps {
 }
 
 function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDeleting }: EditCameraModalProps) {
-  const hasExistingCredentials = Boolean(camera.username);
+  const hasExistingCredentials = Boolean(camera.username && camera.has_password);
   const [formData, setFormData] = useState({
     name: camera.name,
+    ip_address: camera.ip_address,
     port: camera.port,
     username: camera.username || '',
     password: '',
@@ -691,9 +694,14 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
   };
 
   const handleTestConnection = async () => {
-    if (!formData.username || !formData.password) {
+    const requiresPasswordInput = !hasExistingCredentials || changePassword;
+    if (!formData.username || (requiresPasswordInput && !formData.password)) {
       setTestStatus('error');
-      setTestMessage('Username and password are required');
+      setTestMessage(
+        requiresPasswordInput
+          ? 'Username and password are required'
+          : 'Username is required'
+      );
       return;
     }
 
@@ -703,16 +711,26 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
     setAttemptsRemaining(null);
 
     try {
-      const response = await fetch(`http://localhost:8101/api/cameras/test-rtsp`, {
+      const payload: {
+        ip: string;
+        port: number;
+        username: string;
+        rtsp_path: string;
+        password?: string;
+      } = {
+        ip: formData.ip_address,
+        port: formData.port,
+        username: formData.username,
+        rtsp_path: formData.rtsp_path,
+      };
+      if (formData.password) {
+        payload.password = formData.password;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/cameras/${camera.id}/test-rtsp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ip: camera.ip_address,
-          port: formData.port,
-          username: formData.username,
-          password: formData.password,
-          rtsp_path: formData.rtsp_path,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -733,7 +751,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
           setAttemptsRemaining(result.attempts_remaining);
         }
       }
-    } catch (err) {
+    } catch {
       setTestStatus('error');
       setTestMessage('Failed to test connection');
     }
@@ -743,6 +761,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
     e.preventDefault();
     const data: Partial<CameraCreate> = {
       name: formData.name,
+      ip_address: formData.ip_address,
       port: formData.port,
       rtsp_path: formData.rtsp_path,
       location: formData.location || undefined,
@@ -753,18 +772,13 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="bg-slate-800 rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Edit Camera</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        <div className="mb-4 p-3 bg-slate-700 rounded-lg">
-          <p className="text-slate-400 text-sm">IP Address</p>
-          <p className="text-white font-mono">{camera.ip_address}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -775,6 +789,18 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">IP Address <span className="text-red-400">*</span></label>
+            <input
+              type="text"
+              value={formData.ip_address}
+              onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono"
+              placeholder="192.168.1.100"
               required
             />
           </div>
@@ -801,7 +827,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
               Password {!hasExistingCredentials && <span className="text-red-400">*</span>}
             </label>
             {hasExistingCredentials && !changePassword ? (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-400">
                   ••••••••••••
                 </div>
@@ -874,9 +900,19 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
             <button
               type="button"
               onClick={handleTestConnection}
-              disabled={testStatus === 'testing' || testStatus === 'locked' || !formData.username || !formData.password}
+              disabled={
+                testStatus === 'testing' ||
+                testStatus === 'locked' ||
+                !formData.ip_address ||
+                !formData.username ||
+                ((!hasExistingCredentials || changePassword) && !formData.password)
+              }
               className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              title={!formData.password ? "Enter password to test connection" : "Test camera connection"}
+              title={
+                (!hasExistingCredentials || changePassword) && !formData.password
+                  ? "Enter password to test connection"
+                  : "Test camera connection"
+              }
             >
               {testStatus === 'testing' ? (
                 <>
@@ -970,12 +1006,12 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
                 <p className="text-red-300 text-sm mb-3">
                   Are you sure you want to delete "{camera.name}"? This action cannot be undone.
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
                     onClick={onDelete}
                     disabled={isDeleting}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="w-full sm:w-auto px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                     Delete
@@ -983,7 +1019,7 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(false)}
-                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm transition-colors"
+                    className="w-full sm:w-auto px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -992,22 +1028,27 @@ function EditCameraModal({ camera, onClose, onSave, onDelete, isLoading, isDelet
             )}
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isLoading || !formData.username || (!hasExistingCredentials && !formData.password) || (changePassword && !formData.password)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+              disabled={isLoading || !formData.ip_address || !formData.username || (!hasExistingCredentials && !formData.password) || (changePassword && !formData.password)}
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </button>
           </div>
+          {!formData.ip_address && (
+            <p className="text-yellow-500 text-xs mt-2 text-right">
+              IP address is required
+            </p>
+          )}
           {!formData.username && (
             <p className="text-yellow-500 text-xs mt-2 text-right">
               Username is required
@@ -1038,8 +1079,8 @@ interface ExpandedCameraViewProps {
 function ExpandedCameraView({ camera, onClose }: ExpandedCameraViewProps) {
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      <div className="flex items-center justify-between p-4 bg-slate-900">
-        <h2 className="text-xl font-semibold text-white">{camera.name}</h2>
+      <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-900">
+        <h2 className="text-base sm:text-xl font-semibold text-white truncate pr-3">{camera.name}</h2>
         <button
           onClick={onClose}
           className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
@@ -1047,8 +1088,8 @@ function ExpandedCameraView({ camera, onClose }: ExpandedCameraViewProps) {
           <X className="w-6 h-6 text-white" />
         </button>
       </div>
-      <div className="flex-1 p-4">
-        <CameraCard camera={camera} />
+      <div className="flex-1 min-h-0 p-2 sm:p-4">
+        <CameraCard camera={camera} autoStartOnMount fitContainer />
       </div>
     </div>
   );

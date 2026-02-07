@@ -1,12 +1,9 @@
 from __future__ import annotations
-import asyncio
 import subprocess
-import os
 import time
 import threading
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import signal
 
 from ..config import settings
 
@@ -22,6 +19,7 @@ class StreamManager:
     def __init__(self):
         self._processes: Dict[int, subprocess.Popen] = {}
         self._errors: Dict[int, str] = {}
+        self._playlist_tokens: Dict[int, int] = {}
         self._output_dir = settings.hls_output_dir
 
     def _get_stream_path(self, camera_id: int) -> Path:
@@ -32,6 +30,9 @@ class StreamManager:
 
     def get_playlist_url(self, camera_id: int) -> str:
         """Get the URL for a camera's HLS playlist."""
+        token = self._playlist_tokens.get(camera_id)
+        if token:
+            return f"/streams/camera_{camera_id}/stream.m3u8?v={token}"
         return f"/streams/camera_{camera_id}/stream.m3u8"
 
     def get_stream_error(self, camera_id: int) -> Optional[str]:
@@ -61,6 +62,15 @@ class StreamManager:
         except Exception as e:
             self._errors[camera_id] = str(e)
 
+    def _cleanup_stream_files(self, camera_id: int) -> None:
+        """Delete all existing HLS files for a camera."""
+        output_path = self._get_stream_path(camera_id)
+        for f in output_path.glob("*"):
+            try:
+                f.unlink()
+            except Exception:
+                pass
+
     def start_stream(self, camera_id: int, rtsp_url: str) -> Tuple[bool, Optional[str]]:
         """
         Start streaming from a camera.
@@ -77,9 +87,13 @@ class StreamManager:
 
         # Clear previous errors
         self._errors.pop(camera_id, None)
+        self._playlist_tokens.pop(camera_id, None)
 
         output_path = self._get_stream_path(camera_id)
         playlist_path = output_path / "stream.m3u8"
+        start_token = int(time.time() * 1000)
+        self._playlist_tokens[camera_id] = start_token
+        self._cleanup_stream_files(camera_id)
 
         # Log sanitized URL (hide password)
         safe_url = rtsp_url
@@ -108,7 +122,7 @@ class StreamManager:
             "-hls_time", "1",  # 1 second segments for lower latency
             "-hls_list_size", "3",  # Keep only 3 segments
             "-hls_flags", "delete_segments+append_list+omit_endlist",
-            "-hls_segment_filename", str(output_path / "segment_%03d.ts"),
+            "-hls_segment_filename", str(output_path / f"segment_{start_token}_%03d.ts"),
             str(playlist_path),
         ]
 
@@ -139,8 +153,8 @@ class StreamManager:
             for i in range(60):
                 time.sleep(0.5)
                 if playlist_path.exists() and playlist_path.stat().st_size > 0:
-                    # Also check for at least one segment file
-                    segments = list(output_path.glob("segment_*.ts"))
+                    # Ensure at least one segment from this specific start attempt exists
+                    segments = list(output_path.glob(f"segment_{start_token}_*.ts"))
                     if segments:
                         print(f"[StreamManager] Stream ready for camera {camera_id} (took {(i+1)*0.5:.1f}s)")
                         return True, None
@@ -159,15 +173,18 @@ class StreamManager:
                 return True, None
             else:
                 error = self._errors.get(camera_id, "FFmpeg failed to start stream")
+                self._playlist_tokens.pop(camera_id, None)
                 return False, error
 
         except FileNotFoundError:
             error = "FFmpeg not found. Please install FFmpeg."
             print(f"[StreamManager] {error}")
+            self._playlist_tokens.pop(camera_id, None)
             return False, error
         except Exception as e:
             error = f"Error starting stream: {e}"
             print(f"[StreamManager] {error}")
+            self._playlist_tokens.pop(camera_id, None)
             return False, error
 
     def stop_stream(self, camera_id: int) -> bool:
@@ -194,14 +211,10 @@ class StreamManager:
                 pass
 
         del self._processes[camera_id]
+        self._playlist_tokens.pop(camera_id, None)
 
         # Clean up HLS files
-        output_path = self._get_stream_path(camera_id)
-        for f in output_path.glob("*"):
-            try:
-                f.unlink()
-            except Exception:
-                pass
+        self._cleanup_stream_files(camera_id)
 
         return True
 

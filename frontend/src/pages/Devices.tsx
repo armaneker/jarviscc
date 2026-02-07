@@ -64,14 +64,14 @@ export default function Devices() {
   }, {} as Record<string, Device[]>);
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Smart Devices"
         subtitle={`${devices?.length || 0} devices connected`}
         action={
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+            className="flex w-full items-center justify-center gap-2 px-4 py-2 sm:w-auto bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Add Device</span>
@@ -125,7 +125,7 @@ export default function Devices() {
 
       {/* Empty State */}
       {devices && devices.length === 0 && (
-        <div className="bg-slate-800 rounded-xl p-12 text-center">
+        <div className="bg-slate-800 rounded-xl p-8 sm:p-12 text-center">
           <Plug className="w-16 h-16 text-slate-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">No devices configured</h3>
           <p className="text-slate-400 mb-6">
@@ -184,11 +184,11 @@ function DeviceCard({ device, onControl }: DeviceCardProps) {
 
   return (
     <div className="bg-slate-800 rounded-xl p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${statusColors[device.status] || statusColors.unknown}`} />
-          <div>
-            <h3 className="text-white font-medium">{device.name}</h3>
+          <div className="min-w-0">
+            <h3 className="truncate text-white font-medium">{device.name}</h3>
             <p className="text-slate-400 text-sm capitalize">{device.type}</p>
           </div>
         </div>
@@ -197,7 +197,7 @@ function DeviceCard({ device, onControl }: DeviceCardProps) {
         )}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-slate-400 capitalize">{device.status}</span>
         <div className="flex gap-2">
           <button
@@ -237,8 +237,8 @@ function AddDeviceModal({ onClose, onAdd, isLoading }: AddDeviceModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="bg-slate-800 rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Add Device</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
@@ -274,7 +274,7 @@ function AddDeviceModal({ onClose, onAdd, isLoading }: AddDeviceModalProps) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-slate-400 mb-1">Brand</label>
               <input
@@ -297,18 +297,18 @@ function AddDeviceModal({ onClose, onAdd, isLoading }: AddDeviceModalProps) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Device'}
             </button>

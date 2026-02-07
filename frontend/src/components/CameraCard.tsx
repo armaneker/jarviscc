@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { Camera, Play, Square, Maximize2, Settings, AlertCircle, Loader2 } from 'lucide-react';
 import type { Camera as CameraType } from '../types';
@@ -9,9 +9,18 @@ interface CameraCardProps {
   onExpand?: (camera: CameraType) => void;
   onSettings?: (camera: CameraType) => void;
   autoStartTrigger?: number; // Increment this to trigger auto-start
+  autoStartOnMount?: boolean;
+  fitContainer?: boolean;
 }
 
-export default function CameraCard({ camera, onExpand, onSettings, autoStartTrigger }: CameraCardProps) {
+export default function CameraCard({
+  camera,
+  onExpand,
+  onSettings,
+  autoStartTrigger,
+  autoStartOnMount = false,
+  fitContainer = false,
+}: CameraCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -19,32 +28,32 @@ export default function CameraCard({ camera, onExpand, onSettings, autoStartTrig
   const [error, setError] = useState<string | null>(null);
   const lastTriggerRef = useRef<number>(0);
 
-  useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-      }
-    };
-  }, []);
-
-  // Handle auto-start trigger
-  useEffect(() => {
-    if (autoStartTrigger && autoStartTrigger > lastTriggerRef.current && !isStreaming && !isLoading) {
-      lastTriggerRef.current = autoStartTrigger;
-      startStream();
-    }
-  }, [autoStartTrigger]);
-
-  const startStream = async () => {
+  const startStream = useCallback(async () => {
     if (!videoRef.current) return;
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await streamApi.start(camera.id);
-      const streamUrl = `${API_BASE_URL}${response.stream_url}`;
+      const status = await streamApi.getStatus(camera.id);
+      let streamPath = status.stream_url;
+
+      // If stream isn't already running, start it.
+      if (!status.streaming || !streamPath) {
+        const response = await streamApi.start(camera.id);
+        streamPath = response.stream_url;
+      }
+
+      if (!streamPath) {
+        throw new Error('No stream URL returned by server');
+      }
+
+      const streamUrl = `${API_BASE_URL}${streamPath}`;
 
       if (Hls.isSupported()) {
         const hls = new Hls({
@@ -102,7 +111,7 @@ export default function CameraCard({ camera, onExpand, onSettings, autoStartTrig
 
         // Handle buffer stalls by trying to resume playback
         hls.on(Hls.Events.FRAG_BUFFERED, () => {
-          if (videoRef.current && videoRef.current.paused && isStreaming) {
+          if (videoRef.current && videoRef.current.paused) {
             videoRef.current.play().catch(() => {});
           }
         });
@@ -130,9 +139,9 @@ export default function CameraCard({ camera, onExpand, onSettings, autoStartTrig
       setError(errorMessage);
       setIsLoading(false);
     }
-  };
+  }, [camera.id]);
 
-  const stopStream = async () => {
+  const stopStream = useCallback(async () => {
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -149,15 +158,59 @@ export default function CameraCard({ camera, onExpand, onSettings, autoStartTrig
     }
 
     setIsStreaming(false);
-  };
+  }, [camera.id]);
+
+  const scheduleAutoStart = useCallback(() => {
+    let frameId = 0;
+    let attempts = 0;
+
+    const tryStart = () => {
+      if (videoRef.current) {
+        void startStream();
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 30) {
+        frameId = window.requestAnimationFrame(tryStart);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tryStart);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [startStream]);
+
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
+    };
+  }, []);
+
+  // Handle auto-start trigger
+  useEffect(() => {
+    if (autoStartTrigger && autoStartTrigger > lastTriggerRef.current && !isStreaming && !isLoading) {
+      lastTriggerRef.current = autoStartTrigger;
+      return scheduleAutoStart();
+    }
+  }, [autoStartTrigger, isStreaming, isLoading, scheduleAutoStart]);
+
+  // Auto-start once when mounted (used by fullscreen view)
+  useEffect(() => {
+    if (autoStartOnMount && !isStreaming && !isLoading) {
+      return scheduleAutoStart();
+    }
+  }, [autoStartOnMount, isStreaming, isLoading, scheduleAutoStart]);
 
   return (
-    <div className="bg-slate-800 rounded-xl overflow-hidden group">
+    <div className={`bg-slate-800 rounded-xl overflow-hidden group ${fitContainer ? 'h-full flex flex-col' : ''}`}>
       {/* Video Container */}
-      <div className="relative aspect-video bg-slate-900">
+      <div className={`relative bg-slate-900 ${fitContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain bg-black"
           muted
           playsInline
         />

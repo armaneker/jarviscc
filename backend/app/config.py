@@ -7,6 +7,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     app_name: str = "Jarvis Home Automation"
     debug: bool = True
+    secret_key: str = "jarvis-dev-secret-change-me"
 
     # Database
     database_url: str = "sqlite:///./jarvis.db"

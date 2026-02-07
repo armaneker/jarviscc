@@ -68,27 +68,27 @@ export default function Shopping() {
   );
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Shopping List"
         subtitle={`${pendingItems.length} items to buy`}
         action={
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {purchasedItems.length > 0 && (
               <button
                 onClick={() => clearPurchasedMutation.mutate()}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Clear Purchased</span>
+                <span className="hidden sm:inline">Clear Purchased</span>
               </button>
             )}
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Item</span>
+              <span className="hidden sm:inline">Add Item</span>
             </button>
           </div>
         }
@@ -125,9 +125,9 @@ export default function Shopping() {
 
       {/* Estimated Total */}
       {totalEstimated > 0 && (
-        <div className="bg-slate-800 rounded-lg p-4 mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col items-start gap-1 rounded-lg bg-slate-800 p-4 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-slate-400">Estimated Total</span>
-          <span className="text-2xl font-bold text-white">${totalEstimated.toFixed(2)}</span>
+          <span className="text-xl font-bold text-white sm:text-2xl">${totalEstimated.toFixed(2)}</span>
         </div>
       )}
 
@@ -148,7 +148,7 @@ export default function Shopping() {
 
       {/* Empty State */}
       {items && items.length === 0 && (
-        <div className="bg-slate-800 rounded-xl p-12 text-center">
+        <div className="bg-slate-800 rounded-xl p-8 sm:p-12 text-center">
           <ShoppingCart className="w-16 h-16 text-slate-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">Shopping list is empty</h3>
           <p className="text-slate-400 mb-6">
@@ -220,10 +220,10 @@ interface ShoppingItemCardProps {
 
 function ShoppingItemCard({ item, onToggle, onDelete }: ShoppingItemCardProps) {
   return (
-    <div className="bg-slate-800 rounded-lg p-4 flex items-center gap-4">
+    <div className="bg-slate-800 rounded-lg p-4 flex items-start gap-3 sm:gap-4">
       <button
         onClick={onToggle}
-        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+        className={`mt-0.5 h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors ${
           item.purchased
             ? 'bg-green-500 border-green-500'
             : 'border-slate-500 hover:border-blue-500'
@@ -233,7 +233,7 @@ function ShoppingItemCard({ item, onToggle, onDelete }: ShoppingItemCardProps) {
       </button>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`text-white ${item.purchased ? 'line-through text-slate-400' : ''}`}
           >
@@ -253,22 +253,23 @@ function ShoppingItemCard({ item, onToggle, onDelete }: ShoppingItemCardProps) {
           </span>
         </div>
         {item.notes && (
-          <p className="text-slate-400 text-sm mt-1 truncate">{item.notes}</p>
+          <p className="mt-1 break-words text-sm text-slate-400">{item.notes}</p>
         )}
       </div>
 
-      {item.estimated_price && (
-        <span className="text-slate-300 font-medium">
-          ${(item.estimated_price * item.quantity).toFixed(2)}
-        </span>
-      )}
-
-      <button
-        onClick={onDelete}
-        className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        {item.estimated_price && (
+          <span className="text-slate-300 font-medium text-sm sm:text-base">
+            ${(item.estimated_price * item.quantity).toFixed(2)}
+          </span>
+        )}
+        <button
+          onClick={onDelete}
+          className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -294,8 +295,8 @@ function AddItemModal({ onClose, onAdd, isLoading, categories }: AddItemModalPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="bg-slate-800 rounded-t-xl sm:rounded-xl p-4 sm:p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Add Item</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
@@ -316,7 +317,7 @@ function AddItemModal({ onClose, onAdd, isLoading, categories }: AddItemModalPro
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm text-slate-400 mb-1">Quantity</label>
               <input
@@ -377,18 +378,18 @@ function AddItemModal({ onClose, onAdd, isLoading, categories }: AddItemModalPro
             />
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Item'}
             </button>

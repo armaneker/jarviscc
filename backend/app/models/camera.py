@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 
 from ..database import Base
+from ..services.crypto import decrypt_secret
 
 
 class Camera(Base):
@@ -22,11 +25,20 @@ class Camera(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     @property
+    def has_password(self) -> bool:
+        return bool(self.password)
+
+    @property
+    def decrypted_password(self) -> str | None:
+        return decrypt_secret(self.password)
+
+    @property
     def rtsp_url(self) -> str:
         """Generate the full RTSP URL for this camera."""
         auth = ""
-        if self.username and self.password:
-            auth = f"{self.username}:{self.password}@"
+        password = self.decrypted_password
+        if self.username and password:
+            auth = f"{self.username}:{password}@"
         return f"rtsp://{auth}{self.ip_address}:{self.port}{self.rtsp_path}"
 
     def __repr__(self):

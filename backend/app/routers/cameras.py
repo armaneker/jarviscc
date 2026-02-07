@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+import asyncio
+import re
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
 
 from ..database import get_db
 from ..models.camera import Camera
 from ..schemas.camera import CameraCreate, CameraUpdate, CameraResponse, CameraDiscovery
 from ..services.camera_discovery import discover_cameras
+from ..services.crypto import encrypt_secret
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
 
@@ -52,7 +56,11 @@ def create_camera(camera: CameraCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Camera with this IP already exists")
 
-    db_camera = Camera(**camera.model_dump())
+    camera_data = camera.model_dump()
+    if camera_data.get("password"):
+        camera_data["password"] = encrypt_secret(camera_data["password"])
+
+    db_camera = Camera(**camera_data)
     db.add(db_camera)
     db.commit()
     db.refresh(db_camera)
@@ -71,6 +79,18 @@ def update_camera(
         raise HTTPException(status_code=404, detail="Camera not found")
 
     update_data = camera.model_dump(exclude_unset=True)
+
+    if "ip_address" in update_data and update_data["ip_address"] != db_camera.ip_address:
+        existing = db.query(Camera).filter(
+            Camera.ip_address == update_data["ip_address"],
+            Camera.id != camera_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Camera with this IP already exists")
+
+    if "password" in update_data:
+        update_data["password"] = encrypt_secret(update_data["password"])
+
     for key, value in update_data.items():
         setattr(db_camera, key, value)
 
@@ -102,9 +122,6 @@ async def test_camera_connection(camera_id: int, db: Session = Depends(get_db)):
 
 
 from pydantic import BaseModel
-import aiohttp
-import hashlib
-import re
 
 
 class RTSPTestRequest(BaseModel):
@@ -113,6 +130,14 @@ class RTSPTestRequest(BaseModel):
     username: str
     password: str
     rtsp_path: str = "/cam/realmonitor?channel=1&subtype=1"
+
+
+class CameraRTSPTestRequest(BaseModel):
+    ip: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    rtsp_path: Optional[str] = None
 
 
 async def test_dahua_http_auth(ip: str, username: str, password: str) -> dict:
@@ -200,13 +225,15 @@ async def test_dahua_http_auth(ip: str, username: str, password: str) -> dict:
         return {"success": None, "message": f"HTTP test error: {str(e)}"}
 
 
-@router.post("/test-rtsp")
-async def test_rtsp_connection(request: RTSPTestRequest):
-    """Test RTSP connection with provided credentials using ffprobe and HTTP auth."""
-    import asyncio
-
-    # First, try HTTP auth to get detailed Dahua error messages
-    http_result = await test_dahua_http_auth(request.ip, request.username, request.password)
+async def run_rtsp_connection_test(
+    ip: str,
+    port: int,
+    username: str,
+    password: str,
+    rtsp_path: str
+) -> dict:
+    """Run detailed RTSP and Dahua auth checks for given connection settings."""
+    http_result = await test_dahua_http_auth(ip, username, password)
 
     # If HTTP detected a lock, return immediately
     if http_result.get("locked"):
@@ -225,8 +252,7 @@ async def test_rtsp_connection(request: RTSPTestRequest):
             "attempts_remaining": http_result.get("attempts_remaining")
         }
 
-    # Now try RTSP connection
-    rtsp_url = f"rtsp://{request.username}:{request.password}@{request.ip}:{request.port}{request.rtsp_path}"
+    rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{rtsp_path}"
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -253,34 +279,74 @@ async def test_rtsp_connection(request: RTSPTestRequest):
             output = stdout.decode()
             if "video" in output or "audio" in output:
                 return {"success": True, "message": "Connection successful! Stream is accessible."}
-            else:
-                return {"success": True, "message": "Connected but no video/audio stream detected"}
-        else:
-            error = stderr.decode().lower()
+            return {"success": True, "message": "Connected but no video/audio stream detected"}
 
-            # If we have HTTP auth info, use that for better error messages
-            if http_result.get("success") is False:
-                return {
-                    "success": False,
-                    "message": http_result["message"],
-                    "attempts_remaining": http_result.get("attempts_remaining")
-                }
+        error = stderr.decode().lower()
 
-            # Fallback to parsing RTSP errors
-            if "401" in error or "unauthorized" in error:
-                return {"success": False, "message": "Authentication failed - invalid username or password"}
-            elif "connection refused" in error:
-                return {"success": False, "message": "Connection refused - camera may be offline or RTSP disabled"}
-            elif "no route to host" in error or "network is unreachable" in error:
-                return {"success": False, "message": "Cannot reach camera - check IP address"}
-            elif "timeout" in error or "timed out" in error:
-                return {"success": False, "message": "Connection timed out - camera may be busy or network issue"}
-            elif "invalid data" in error or "invalid argument" in error:
-                return {"success": False, "message": "Invalid RTSP path - try /cam/realmonitor?channel=1&subtype=0"}
-            else:
-                return {"success": False, "message": f"Connection failed: {stderr.decode()[:200]}"}
+        # If we have HTTP auth info, use that for better error messages
+        if http_result.get("success") is False:
+            return {
+                "success": False,
+                "message": http_result["message"],
+                "attempts_remaining": http_result.get("attempts_remaining")
+            }
+
+        # Fallback to parsing RTSP errors
+        if "401" in error or "unauthorized" in error:
+            return {"success": False, "message": "Authentication failed - invalid username or password"}
+        if "connection refused" in error:
+            return {"success": False, "message": "Connection refused - camera may be offline or RTSP disabled"}
+        if "no route to host" in error or "network is unreachable" in error:
+            return {"success": False, "message": "Cannot reach camera - check IP address"}
+        if "timeout" in error or "timed out" in error:
+            return {"success": False, "message": "Connection timed out - camera may be busy or network issue"}
+        if "invalid data" in error or "invalid argument" in error:
+            return {"success": False, "message": "Invalid RTSP path - try /cam/realmonitor?channel=1&subtype=0"}
+        return {"success": False, "message": f"Connection failed: {stderr.decode()[:200]}"}
 
     except FileNotFoundError:
         return {"success": False, "message": "FFmpeg/ffprobe not installed on server"}
     except Exception as e:
         return {"success": False, "message": f"Test failed: {str(e)}"}
+
+
+@router.post("/{camera_id}/test-rtsp")
+async def test_saved_camera_rtsp_connection(
+    camera_id: int,
+    request: CameraRTSPTestRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Test RTSP connection for an existing camera.
+
+    Uses stored credentials by default, with optional request overrides.
+    """
+    camera = db.query(Camera).filter(Camera.id == camera_id).first()
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    ip = request.ip or camera.ip_address
+    port = request.port or camera.port
+    username = request.username or camera.username
+    password = request.password or camera.decrypted_password
+    rtsp_path = request.rtsp_path or camera.rtsp_path
+
+    if not username or not password:
+        return {
+            "success": False,
+            "message": "Camera credentials not configured. Edit the camera and set username/password."
+        }
+
+    return await run_rtsp_connection_test(ip, port, username, password, rtsp_path)
+
+
+@router.post("/test-rtsp")
+async def test_rtsp_connection(request: RTSPTestRequest):
+    """Test RTSP connection with provided credentials using ffprobe and HTTP auth."""
+    return await run_rtsp_connection_test(
+        request.ip,
+        request.port,
+        request.username,
+        request.password,
+        request.rtsp_path,
+    )

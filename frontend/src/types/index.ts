@@ -5,7 +5,7 @@ export interface Camera {
   ip_address: string;
   port: number;
   username?: string;
-  password?: string;
+  has_password: boolean;
   rtsp_path: string;
   location?: string;
   brand: string;

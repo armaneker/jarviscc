@@ -44,10 +44,10 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Start the server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8101 --reload
 ```
 
-The backend will be running at: http://localhost:8000
+The backend will be running at: http://localhost:8101
 
 ### 2. Start the Frontend
 
@@ -61,13 +61,13 @@ npm install
 npm run dev
 ```
 
-The frontend will be running at: http://localhost:5173
+The frontend will be running at: http://localhost:5501
 
 ## API Documentation
 
 Once the backend is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8101/docs
+- ReDoc: http://localhost:8101/redoc
 
 ## Camera Setup
 
@@ -124,12 +124,13 @@ jarvis/
 ```env
 DATABASE_URL=sqlite:///./jarvis.db
 DEBUG=true
+SECRET_KEY=replace-with-a-long-random-secret
 ```
 
 ### Frontend (.env file in frontend/)
 
 ```env
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8101
 ```
 
 ## Next Steps / Roadmap
@@ -141,4 +142,5 @@ VITE_API_URL=http://localhost:8000
 - [ ] Motion detection alerts
 - [ ] Recording/playback
 - [ ] Mobile-responsive design improvements
+- [ ] Migrate wall display to newer tablet hardware (low priority)
 - [ ] Docker containerization
